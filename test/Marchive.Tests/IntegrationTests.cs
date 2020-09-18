@@ -65,9 +65,7 @@ namespace Marchive.Tests
             Assert.True(File.Exists(Path.Combine(unArchiveDirectory, fileName)));
 
             // ** Extracted files are identical to original **
-            var extracted = File.ReadAllBytes(Path.Combine(unArchiveDirectory, fileName));
-            var original = File.ReadAllBytes(filePath);
-            Assert.Equal(original, extracted);
+            Assert.Equal(File.ReadAllBytes(filePath), File.ReadAllBytes(Path.Combine(unArchiveDirectory, fileName)));
 
             // Cleanup
             File.Delete(archiveFileName + ".mar");

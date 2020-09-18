@@ -1,24 +1,20 @@
 ﻿using System;
-using System.IO;
 using Marchive.App;
 using Marchive.App.IO;
 using Microsoft.Extensions.CommandLineUtils;
 
 namespace Marchive.Console
 {
-    class Program
+    public class Program
     {
-        // TODO Move to args
-        private static string[] _inputFilesToArchive = { "input1.txt", "input2.txt", "input3.txt" };
-        private static string _outputArchiveFileName = Path.Combine("Archive", "archive");
-        private static string _inputArchiveFileName = Path.Combine("Archive", "archive");
-        private static string _outputUnArchiveDirectory = "UnArchive";
         private const string DefaultArchiveFileName = "archive";
         public static void Main(string[] args)
         {
-            var app = new CommandLineApplication(throwOnUnexpectedArg: false);
-            app.Description =
-                "Marchive is a command line utility that lets you easily archive multiple files into a single one in a jiffy.";
+            var app = new CommandLineApplication(throwOnUnexpectedArg: false)
+            {
+                Description =
+                    "Marchive is a command line utility that lets you easily archive multiple files into a single one, in a jiffy."
+            };
 
             app.Command("archive",
                 archive =>

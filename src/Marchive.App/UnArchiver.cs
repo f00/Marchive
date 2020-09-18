@@ -34,15 +34,19 @@ namespace Marchive.App
             var metaData = archive
                 .Skip((int)metaDataPosition)
                 .ChunkBy(Constants.MetaBlockSizeBytes);
+
             foreach (var fileInfoMeta in metaData)
             {
                 var filename = _settings.FileNameEncoding.GetString(fileInfoMeta
                     .Skip(Constants.MetaDataFileStartPosSizeBytes + Constants.MetaDataFileEndPosSizeBytes)
                     .TakeWhile(x => x != 0).ToArray());
+
                 var dataStartingPos =
                     BitConverter.ToInt64(fileInfoMeta.Take(Constants.MetaDataFileStartPosSizeBytes).ToArray());
+
                 var dataEndingPos = BitConverter.ToInt64(fileInfoMeta.Skip(Constants.MetaDataFileStartPosSizeBytes)
                     .Take(Constants.MetaDataFileStartPosSizeBytes).ToArray());
+
                 var content = archive.Skip((int)dataStartingPos).Take((int)(dataEndingPos - dataStartingPos));
 
                 _fileSystem.SaveFile(Path.Combine(outputUnArchiveDirectory, Path.GetFileName(filename)), content.ToArray());
