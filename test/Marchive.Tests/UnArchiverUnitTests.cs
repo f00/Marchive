@@ -26,8 +26,8 @@ namespace Marchive.Tests
             var archiveContent = GetArchive(archiveFileName,
                 new List<(string name, string content)>()
                     {("file1.bin", "file 1 content and then some"), ("file2.bin", "file 2 content")});
-            A.CallTo(() => _fileSystem.OpenFile(A<string>.Ignored))
-                .ReturnsLazily(() => new FileStreamProxy(new MemoryStream(archiveContent)));
+            A.CallTo(() => _fileSystem.ReadAllBytes(A<string>.Ignored))
+                .Returns(archiveContent);
 
             _unArchiver.UnArchive(archiveFileName);
 
@@ -43,8 +43,8 @@ namespace Marchive.Tests
             var archiver = new Archiver(fileSystem);
             foreach (var file in filesAndContent)
             {
-                A.CallTo(() => fileSystem.OpenFile(file.name))
-                    .ReturnsLazily(() => new FileStreamProxy(new MemoryStream(Encoding.UTF8.GetBytes(file.content))));
+                A.CallTo(() => fileSystem.ReadAllBytes(file.name))
+                    .Returns(Encoding.UTF8.GetBytes(file.content));
             }
             A.CallTo(() => fileSystem.SaveFile(A<string>.Ignored, A<byte[]>.Ignored))
                 .Invokes(x => ms = new MemoryStream(x.GetArgument<byte[]>("content")));

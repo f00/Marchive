@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using Marchive.App.IO;
 
 namespace Marchive.App
@@ -32,61 +31,57 @@ namespace Marchive.App
                 return;
             }
 
-            // Read file content
-            foreach (var filename in fileNames)
+            WriteHeaderBlock();
+
+            var metaBlock = new MemoryStream();
+            foreach (var fileName in fileNames)
             {
-                var buffer = new byte[_settings.BlockSizeBytes];
+                ValidateFileNameLength(fileName);
 
-                AddFileNameToBuffer(filename, buffer);
+                var metaFileInfoBlock = new MemoryStream();
+                var fileNameBlock = new byte[Constants.MaxFileNameLengthBytes];
+                var fileStartingIndexBlock = new byte[Constants.MetaDataFileStartPosSizeBytes];
+                var fileEndingIndexBlock = new byte[Constants.MetaDataFileEndPosSizeBytes];
+                
+                var fileStartingIndex = _archiveStream.Position;
 
-                WriteToArchive(filename, buffer);
+                var file = _fileSystem.ReadAllBytes(fileName);
+                _archiveStream.Write(file);
+
+                var fileEndingIndex = _archiveStream.Position;
+                
+                BitConverter.GetBytes(fileStartingIndex).CopyTo(fileStartingIndexBlock, 0);
+                BitConverter.GetBytes(fileEndingIndex).CopyTo(fileEndingIndexBlock, 0);
+                _settings.FileNameEncoding.GetBytes(fileName).CopyTo(fileNameBlock, 0);
+                metaFileInfoBlock.Write(fileStartingIndexBlock);
+                metaFileInfoBlock.Write(fileEndingIndexBlock);
+                metaFileInfoBlock.Write(fileNameBlock);
+                metaBlock.Write(metaFileInfoBlock.ToArray());
             }
 
-            _fileSystem.SaveFile(archiveFileName + Constants.FileExtensionName, _archiveStream.ToArray());
+            var metaBlockStartingPosition = _archiveStream.Position;
+
+            _archiveStream.Write(metaBlock.ToArray());
+
+            var archive = _archiveStream.ToArray();
+            BitConverter.GetBytes(metaBlockStartingPosition).CopyTo(archive, 0);
+            _fileSystem.SaveFile(archiveFileName + Constants.FileExtensionName, archive);
             _archiveStream.Flush();
         }
 
-        private void AddFileNameToBuffer(string filename, byte[] buffer)
+        private void WriteHeaderBlock()
         {
-            // First n bytes in new file block are dedicated to filename
-            if (_settings.FileNameEncoding.GetBytes(filename).Length > _settings.MaxFilenameLengthBytes)
+            var headerBlock = new byte[Constants.HeaderSizeBytes];
+            _archiveStream.Write(headerBlock);
+        }
+
+        private void ValidateFileNameLength(string filename)
+        {
+            if (_settings.FileNameEncoding.GetBytes(filename).Length > Constants.MaxFileNameLengthBytes)
             {
                 throw new ArgumentOutOfRangeException(nameof(filename),
-                    $"Filename {filename} is too long. Maximum {_settings.MaxFilenameLengthBytes} bytes allowed.");
+                    $"Filename {filename} is too long. Maximum {Constants.MaxFileNameLengthBytes} bytes allowed.");
             }
-
-            var filenameBuffer = new byte[_settings.MaxFilenameLengthBytes];
-            _settings.FileNameEncoding.GetBytes(filename).CopyTo(filenameBuffer, 0);
-            filenameBuffer.CopyTo(buffer, 0);
-        }
-
-        private void WriteToArchive(string filename, byte[] buffer)
-        {
-            using var fs = _fileSystem.OpenFile(filename);
-
-            WriteFirstBlockIncludingFileName(buffer, fs);
-
-            // Write rest of the blocks
-            while (true)
-            {
-                buffer = new byte[_settings.BlockSizeBytes]; // Zero out the buffer
-                var read = fs.Read(buffer, 0, buffer.Length);
-                if (read <= 0)
-                {
-                    // End of file
-                    _archiveStream.Write(new byte[_settings.BlockSizeBytes]); // Write empty file separator block
-                    break;
-                }
-
-                _archiveStream.Write(buffer, 0, buffer.Length);
-            }
-        }
-
-        private void WriteFirstBlockIncludingFileName(byte[] buffer, IFileStream fs)
-        {
-            // Special case first block that includes the filename
-            fs.Read(buffer, _settings.MaxFilenameLengthBytes, buffer.Length - _settings.MaxFilenameLengthBytes);
-            _archiveStream.Write(buffer, 0, buffer.Length);
         }
 
         public void Dispose()

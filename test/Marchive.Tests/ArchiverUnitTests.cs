@@ -25,8 +25,8 @@ namespace Marchive.Tests
             var fileNames = new[] { "file1.bin", "file2.exe" };
             var archiveFileName = "archive";
             var fileContent = Encoding.UTF8.GetBytes("content of file");
-            A.CallTo(() => _fileSystem.OpenFile(A<string>.Ignored))
-                .ReturnsLazily(() => new FileStreamProxy(new MemoryStream(fileContent)));
+            A.CallTo(() => _fileSystem.ReadAllBytes(A<string>.Ignored))
+                .Returns(fileContent);
 
             _archiver.Archive(fileNames.ToList(), archiveFileName);
 
@@ -39,7 +39,14 @@ namespace Marchive.Tests
         [Fact]
         public void GivenFileNameTooLong_WhenArchive_ThenThrowsException()
         {
-            var fileName = "qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnqwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbn.bin";
+            var fileName =
+                "qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnqwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvb"
+                + "qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnqwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbn"
+                + "qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnqwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbn"
+                + "qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnqwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbn"
+                + "qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnqwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbn"
+                + "qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnqwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbn"
+                + "qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnqwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbn.bin";
             var archiveFileName = "archive";
 
             Assert.Throws<ArgumentOutOfRangeException>(() => _archiver.Archive(new[] { fileName }.ToList(), archiveFileName));

@@ -1,9 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using Marchive.App.IO;
+using Marchive.App.Utilities;
 
 namespace Marchive.App
 {
@@ -26,18 +25,27 @@ namespace Marchive.App
         public void UnArchive(string archiveFileName, string outputUnArchiveDirectory = null)
         {
             archiveFileName = AppendFileExtensionIfNeeded(archiveFileName);
-            // TODO Move encoding to settings
 
             outputUnArchiveDirectory ??= Directory.GetCurrentDirectory();
 
-            var rawFiles = SplitArchive(archiveFileName);
-
-            foreach (var rawFile in rawFiles)
+            var archive = _fileSystem.ReadAllBytes(archiveFileName);
+            var metaDataPosition =
+                BitConverter.ToInt64(archive.Take(Constants.HeaderSizeBytes).ToArray(), 0);
+            var metaData = archive
+                .Skip((int)metaDataPosition)
+                .ChunkBy(Constants.MetaBlockSizeBytes);
+            foreach (var fileInfoMeta in metaData)
             {
-                var filename = _settings.FileNameEncoding.GetString(rawFile.TakeWhile(x => x != 0).ToArray());
-                var content = rawFile.Skip(_settings.MaxFilenameLengthBytes).ToArray();
+                var filename = _settings.FileNameEncoding.GetString(fileInfoMeta
+                    .Skip(Constants.MetaDataFileStartPosSizeBytes + Constants.MetaDataFileEndPosSizeBytes)
+                    .TakeWhile(x => x != 0).ToArray());
+                var dataStartingPos =
+                    BitConverter.ToInt64(fileInfoMeta.Take(Constants.MetaDataFileStartPosSizeBytes).ToArray());
+                var dataEndingPos = BitConverter.ToInt64(fileInfoMeta.Skip(Constants.MetaDataFileStartPosSizeBytes)
+                    .Take(Constants.MetaDataFileStartPosSizeBytes).ToArray());
+                var content = archive.Skip((int)dataStartingPos).Take((int)(dataEndingPos - dataStartingPos));
 
-                _fileSystem.SaveFile(Path.Combine(outputUnArchiveDirectory, Path.GetFileName(filename)), content);
+                _fileSystem.SaveFile(Path.Combine(outputUnArchiveDirectory, Path.GetFileName(filename)), content.ToArray());
             }
         }
 
@@ -49,56 +57,6 @@ namespace Marchive.App
             }
 
             return archiveFileName;
-        }
-
-        private IEnumerable<List<byte>> SplitArchive(string archiveFileName)
-        {
-            var rawFiles = new List<List<byte>>();
-            var file = new List<byte>();
-            using var fs = _fileSystem.OpenFile(archiveFileName);
-            while (true)
-            {
-                // Split into raw list of files
-                var buffer = new byte[_settings.BlockSizeBytes];
-                var read = fs.Read(buffer, 0, buffer.Length);
-
-                if (read <= 0)
-                {
-                    // End of file
-                    break;
-                }
-
-                if (IsEmptyBlock(buffer))
-                {
-                    rawFiles.Add(file);
-                    file = new List<byte>();
-                }
-                else
-                {
-                    file.AddRange(RemoveEmptyBytesAtEndOfBlock(buffer));
-                }
-            }
-
-            return rawFiles;
-        }
-
-        private static bool IsEmptyBlock(byte[] block) => block.All(x => x == 0);
-
-        private byte[] RemoveEmptyBytesAtEndOfBlock(byte[] data)
-        {
-            int lastNonZeroBitIndex = -1;
-            for (var i = data.Length - 1; i > 0; i--)
-            {
-                if (data[i] != 0)
-                {
-                    lastNonZeroBitIndex = i;
-                    break;
-                }
-            }
-
-            var result = new byte[lastNonZeroBitIndex + 1];
-            Array.Copy(data, 0, result, 0, result.Length);
-            return result;
         }
     }
 }

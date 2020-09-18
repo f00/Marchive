@@ -2,7 +2,7 @@
 {
     public interface IFileSystem
     {
-        IFileStream OpenFile(string filename);
         void SaveFile(string filename, byte[] content);
+        byte[] ReadAllBytes(string filename);
     }
 }
