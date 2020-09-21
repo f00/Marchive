@@ -1,4 +1,4 @@
-﻿namespace Marchive.App
+﻿namespace Marchive.App.Settings
 {
     /// <summary>
     /// Warning, changing values here might make existing archive files unusable.

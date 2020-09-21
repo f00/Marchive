@@ -5,6 +5,8 @@ using System.Text;
 using FakeItEasy;
 using Marchive.App;
 using Marchive.App.IO;
+using Marchive.App.Services;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Marchive.Tests
@@ -16,7 +18,7 @@ namespace Marchive.Tests
 
         public ArchiverUnitTests()
         {
-            _archiver = new Archiver(_fileSystem);
+            _archiver = new Archiver(_fileSystem, A.Fake<ILogger<Archiver>>());
         }
 
         [Fact]

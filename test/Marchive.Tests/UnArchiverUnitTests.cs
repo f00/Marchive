@@ -5,6 +5,8 @@ using System.Text;
 using FakeItEasy;
 using Marchive.App;
 using Marchive.App.IO;
+using Marchive.App.Services;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Marchive.Tests
@@ -16,7 +18,7 @@ namespace Marchive.Tests
 
         public UnArchiverUnitTests()
         {
-            _unArchiver = new UnArchiver(_fileSystem);
+            _unArchiver = new UnArchiver(_fileSystem, A.Fake<ILogger<UnArchiver>>());
         }
 
         [Fact]
@@ -40,7 +42,7 @@ namespace Marchive.Tests
         {
             var fileSystem = A.Fake<IFileSystem>();
             MemoryStream ms = new MemoryStream();
-            var archiver = new Archiver(fileSystem);
+            var archiver = new Archiver(fileSystem, A.Fake<ILogger<Archiver>>());
             foreach (var file in filesAndContent)
             {
                 A.CallTo(() => fileSystem.ReadAllBytes(file.name))

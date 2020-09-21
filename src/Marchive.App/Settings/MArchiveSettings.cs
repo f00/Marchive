@@ -1,19 +1,19 @@
 ﻿using System.Text;
 
-namespace Marchive.App
+namespace Marchive.App.Settings
 {
-    public class ArchiverSettings
+    public class MArchiveSettings
     {
         /// <summary>
         /// Configure behavior of archiver
         /// </summary>
         /// <param name="fileNameEncoding">Encoding of the given file names</param>
-        public ArchiverSettings(Encoding fileNameEncoding)
+        public MArchiveSettings(Encoding fileNameEncoding)
         {
             FileNameEncoding = fileNameEncoding;
         }
 
-        public ArchiverSettings()
+        public MArchiveSettings()
         {
         }
         public Encoding FileNameEncoding { get; } = Encoding.UTF8;

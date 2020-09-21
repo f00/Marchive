@@ -2,7 +2,7 @@
 
 namespace Marchive.App.IO
 {
-    public class FileSystemProxy : IFileSystem
+    internal class FileSystemProxy : IFileSystem
     {
         public void SaveFile(string filename, byte[] content)
         {

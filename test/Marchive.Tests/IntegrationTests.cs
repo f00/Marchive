@@ -1,15 +1,18 @@
 using System.IO;
 using System.Linq;
+using FakeItEasy;
 using Marchive.App;
 using Marchive.App.IO;
+using Marchive.App.Services;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Marchive.Tests
 {
     public class IntegrationTests
     {
-        private readonly Archiver _archiver = new Archiver(new FileSystemProxy());
-        private readonly UnArchiver _unArchiver = new UnArchiver(new FileSystemProxy());
+        private readonly Archiver _archiver = new Archiver(new FileSystemProxy(), A.Fake<ILogger<Archiver>>());
+        private readonly UnArchiver _unArchiver = new UnArchiver(new FileSystemProxy(), A.Fake<ILogger<UnArchiver>>());
         private const string FixturePath = "Fixtures";
 
         [Fact]

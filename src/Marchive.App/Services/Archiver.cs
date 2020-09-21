@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Marchive.App.IO;
+using Marchive.App.Settings;
+using Microsoft.Extensions.Logging;
 
-namespace Marchive.App
+namespace Marchive.App.Services
 {
     /// <summary>
     /// -------Archive file structure--------
@@ -15,26 +17,23 @@ namespace Marchive.App
     /// * Meta data block contains one sub blocks per file in archive
     /// * Sub blocks contain start and end position of the file and the file name
     /// </summary>
-    public class Archiver : IDisposable
+    internal class Archiver : IDisposable
     {
         private readonly IFileSystem _fileSystem;
         private readonly MemoryStream _archiveStream;
         private readonly MemoryStream _metaDataStream;
-        private readonly ArchiverSettings _settings;
+        private readonly ILogger<Archiver> _logger;
+        private readonly MArchiveSettings _settings;
 
-        public Archiver(IFileSystem fileSystem, ArchiverSettings settings = null)
+        public Archiver(IFileSystem fileSystem, ILogger<Archiver> logger, MArchiveSettings settings = null)
         {
             _fileSystem = fileSystem;
+            _logger = logger;
             _archiveStream = new MemoryStream();
             _metaDataStream = new MemoryStream();
-            _settings = settings ?? new ArchiverSettings();
+            _settings = settings ?? new MArchiveSettings();
         }
 
-        /// <summary>
-        /// Archives one or many files into one single .mar archive file
-        /// </summary>
-        /// <param name="fileNames">The names (including path) of the files to archive</param>
-        /// <param name="archiveFileName">The desired name of the outputted archive file</param>
         public void Archive(List<string> fileNames, string archiveFileName)
         {
             if (!fileNames.Any())
@@ -44,8 +43,11 @@ namespace Marchive.App
 
             var archive = CreateArchive(fileNames);
 
-            _fileSystem.SaveFile(archiveFileName + Constants.FileExtensionName, archive);
+            var saveFileName = archiveFileName + Constants.FileExtensionName;
+            _fileSystem.SaveFile(saveFileName, archive);
             _archiveStream.Flush();
+
+            _logger.LogInformation("Archive {filename} successfully created.", saveFileName);
         }
 
         private byte[] CreateArchive(List<string> fileNames)

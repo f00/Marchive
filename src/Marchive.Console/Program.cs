@@ -1,7 +1,9 @@
 ﻿using System;
 using Marchive.App;
-using Marchive.App.IO;
 using Microsoft.Extensions.CommandLineUtils;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Marchive.Console
 {
@@ -10,6 +12,20 @@ namespace Marchive.Console
         private const string DefaultArchiveFileName = "archive";
         public static void Main(string[] args)
         {
+            var builder = new HostBuilder()
+                .ConfigureServices((hostContext, services) =>
+                {
+                    services.AddLogging(configure =>
+                        {
+                            configure.AddConsole(cfg => cfg.LogToStandardErrorThreshold = LogLevel.Information);
+                            configure.AddDebug();
+                        });
+                    services.AddMarchive();
+
+                });
+            var host = builder.Build();
+            var archiver = host.Services.GetService<IMarchive>();
+
             var app = new CommandLineApplication(throwOnUnexpectedArg: false)
             {
                 Description =
@@ -17,25 +33,24 @@ namespace Marchive.Console
             };
 
             app.Command("archive",
-                archive =>
-                {
-                    var filesToArchive = archive.Argument(
-                        "files",
-                        "The names of the files to be archived",
-                        multipleValues: true);
-                    var archiveFileName = archive.Option(
+                    archive =>
+                    {
+                        var filesToArchive = archive.Argument(
+                            "files",
+                            "The names of the files to be archived",
+                            multipleValues: true);
+                        var archiveFileName = archive.Option(
                         "-n | --name",
                         "The name of the archive file (default is 'archive').",
                         CommandOptionType.SingleValue);
-                    archive.HelpOption("-? | -h | --help");
-                    archive.OnExecute(() =>
-                    {
-                        using var archiver = new Archiver(new FileSystemProxy());
-                        archiver.Archive(filesToArchive.Values, archiveFileName.HasValue() ? archiveFileName.Value() : DefaultArchiveFileName);
+                        archive.HelpOption("-? | -h | --help");
+                        archive.OnExecute(() =>
+                        {
+                            archiver.Archive(filesToArchive.Values, archiveFileName.HasValue() ? archiveFileName.Value() : DefaultArchiveFileName);
 
-                        return 0;
+                            return 0;
+                        });
                     });
-                });
 
             app.Command("un-archive",
                 unArchive =>
@@ -51,8 +66,7 @@ namespace Marchive.Console
                     unArchive.HelpOption("-? | -h | --help");
                     unArchive.OnExecute(() =>
                     {
-                        var unArchiver = new UnArchiver(new FileSystemProxy());
-                        unArchiver.UnArchive(archiveFileName.Value, archiveDirectory?.Value());
+                        archiver.UnArchive(archiveFileName.Value, archiveDirectory?.Value());
 
                         return 0;
                     });
