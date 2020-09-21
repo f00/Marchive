@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using Marchive.App.IO;
 using Marchive.App.Settings;
-using Microsoft.Extensions.Logging;
 
 namespace Marchive.App.Services
 {
@@ -22,32 +21,28 @@ namespace Marchive.App.Services
         private readonly IFileSystem _fileSystem;
         private readonly MemoryStream _archiveStream;
         private readonly MemoryStream _metaDataStream;
-        private readonly ILogger<Archiver> _logger;
         private readonly MArchiveSettings _settings;
 
-        public Archiver(IFileSystem fileSystem, ILogger<Archiver> logger, MArchiveSettings settings = null)
+        public Archiver(IFileSystem fileSystem, MArchiveSettings settings = null)
         {
             _fileSystem = fileSystem;
-            _logger = logger;
             _archiveStream = new MemoryStream();
             _metaDataStream = new MemoryStream();
             _settings = settings ?? new MArchiveSettings();
         }
 
-        public void Archive(List<string> fileNames, string archiveFileName)
+        public byte[] Archive(List<string> fileNames, string archiveFileName)
         {
             if (!fileNames.Any())
             {
-                return;
+                return new byte[0];
             }
 
             var archive = CreateArchive(fileNames);
 
-            var saveFileName = archiveFileName + Constants.FileExtensionName;
-            _fileSystem.SaveFile(saveFileName, archive);
             _archiveStream.Flush();
 
-            _logger.LogInformation("Archive {filename} successfully created.", saveFileName);
+            return archive;
         }
 
         private byte[] CreateArchive(List<string> fileNames)

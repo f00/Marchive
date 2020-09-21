@@ -1,7 +1,6 @@
 using System.IO;
 using System.Linq;
 using FakeItEasy;
-using Marchive.App;
 using Marchive.App.IO;
 using Marchive.App.Services;
 using Microsoft.Extensions.Logging;
@@ -11,9 +10,15 @@ namespace Marchive.Tests
 {
     public class IntegrationTests
     {
-        private readonly Archiver _archiver = new Archiver(new FileSystemProxy(), A.Fake<ILogger<Archiver>>());
-        private readonly UnArchiver _unArchiver = new UnArchiver(new FileSystemProxy(), A.Fake<ILogger<UnArchiver>>());
+        private readonly App.Marchive _marchive;
         private const string FixturePath = "Fixtures";
+
+        public IntegrationTests()
+        {
+            var fileSystem = new FileSystemProxy();
+            _marchive = new App.Marchive(new Archiver(fileSystem), new UnArchiver(fileSystem), fileSystem,
+                A.Fake<ILogger<App.Marchive>>());
+        }
 
         [Fact]
         public void GivenTwoTextFiles_WhenArchiveAndUnArchive_ThenUnArchivedFilesAreIdenticalToOriginal()
@@ -27,8 +32,8 @@ namespace Marchive.Tests
             const string unArchiveDirectory = "UnArchive";
 
             // Act
-            _archiver.Archive(new[] { file1Path, file2Path }.ToList(), archiveFileName);
-            _unArchiver.UnArchive(archiveFileName, unArchiveDirectory);
+            _marchive.Archive(new[] { file1Path, file2Path }.ToList(), archiveFileName);
+            _marchive.UnArchive(archiveFileName, unArchiveDirectory);
 
             // Assert
             // ** Produces archive file **
@@ -57,8 +62,8 @@ namespace Marchive.Tests
             const string unArchiveDirectory = "UnArchive";
 
             // Act
-            _archiver.Archive(new[] { filePath }.ToList(), archiveFileName);
-            _unArchiver.UnArchive(archiveFileName, unArchiveDirectory);
+            _marchive.Archive(new[] { filePath }.ToList(), archiveFileName);
+            _marchive.UnArchive(archiveFileName, unArchiveDirectory);
 
             // Assert
             // ** Produces archive file **

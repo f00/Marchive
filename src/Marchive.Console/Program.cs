@@ -17,6 +17,7 @@ namespace Marchive.Console
                 {
                     services.AddLogging(configure =>
                         {
+                            // TODO Logging to console is not working for some reason on published app
                             configure.AddConsole(cfg => cfg.LogToStandardErrorThreshold = LogLevel.Information);
                             configure.AddDebug();
                         });

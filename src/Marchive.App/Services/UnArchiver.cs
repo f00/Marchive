@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using Marchive.App.IO;
 using Marchive.App.Settings;
 using Marchive.App.Utilities;
-using Microsoft.Extensions.Logging;
 
 namespace Marchive.App.Services
 {
@@ -13,20 +11,16 @@ namespace Marchive.App.Services
     {
         private readonly IFileSystem _fileSystem;
         private readonly MArchiveSettings _settings;
-        private readonly ILogger<UnArchiver> _logger;
 
-        public UnArchiver(IFileSystem fileSystem, ILogger<UnArchiver> logger, MArchiveSettings settings = null)
+        public UnArchiver(IFileSystem fileSystem, MArchiveSettings settings = null)
         {
             _fileSystem = fileSystem;
-            _logger = logger;
             _settings = settings ?? new MArchiveSettings();
         }
 
-        public void UnArchive(string archiveFileName, string outputUnArchiveDirectory = null)
+        public IEnumerable<(string filename, byte[] content)> UnArchive(string archiveFileName)
         {
             archiveFileName = AppendFileExtensionIfNeeded(archiveFileName);
-
-            outputUnArchiveDirectory ??= Directory.GetCurrentDirectory();
 
             var archive = _fileSystem.ReadAllBytes(archiveFileName);
             var metaDataPosition =
@@ -35,30 +29,13 @@ namespace Marchive.App.Services
                 .Skip((int)metaDataPosition)
                 .ChunkBy(Constants.MetaBlockSizeBytes);
 
-            int successCount = 0;
-            var errors = new List<string>();
             foreach (var fileInfoMeta in metaData)
             {
-                try
-                {
-                    ExtractFile(outputUnArchiveDirectory, fileInfoMeta, archive);
-                    successCount++;
-                }
-                catch (Exception e)
-                {
-                    errors.Add(e.Message);
-                }
-            }
-
-            _logger.LogInformation("{success}/{total} files extracted successfully.", successCount, metaData.Count);
-            if (errors.Any())
-            {
-                _logger.LogError("{errorCount} files with errors. Messages: {newline}{errorMessages}",
-                    metaData.Count - successCount, Environment.NewLine, string.Join(Environment.NewLine, errors));
+                yield return ExtractFile(fileInfoMeta, archive);
             }
         }
 
-        private void ExtractFile(string outputUnArchiveDirectory, IReadOnlyCollection<byte> fileInfoMeta, byte[] archive)
+        private (string filename, byte[] content) ExtractFile(IReadOnlyCollection<byte> fileInfoMeta, IEnumerable<byte> archive)
         {
             var filename = _settings.FileNameEncoding.GetString(fileInfoMeta
                 .Skip(Constants.MetaDataFileStartPosSizeBytes + Constants.MetaDataFileEndPosSizeBytes)
@@ -72,7 +49,7 @@ namespace Marchive.App.Services
 
             var content = archive.Skip((int) dataStartingPos).Take((int) (dataEndingPos - dataStartingPos));
 
-            _fileSystem.SaveFile(Path.Combine(outputUnArchiveDirectory, Path.GetFileName(filename)), content.ToArray());
+            return (filename, content.ToArray());
         }
 
         private static string AppendFileExtensionIfNeeded(string archiveFileName)

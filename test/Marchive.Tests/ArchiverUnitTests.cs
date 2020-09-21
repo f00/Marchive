@@ -1,12 +1,11 @@
 using System;
-using System.IO;
 using System.Linq;
 using System.Text;
 using FakeItEasy;
-using Marchive.App;
+using FluentAssertions;
 using Marchive.App.IO;
 using Marchive.App.Services;
-using Microsoft.Extensions.Logging;
+using Marchive.App.Settings;
 using Xunit;
 
 namespace Marchive.Tests
@@ -18,11 +17,11 @@ namespace Marchive.Tests
 
         public ArchiverUnitTests()
         {
-            _archiver = new Archiver(_fileSystem, A.Fake<ILogger<Archiver>>());
+            _archiver = new Archiver(_fileSystem);
         }
 
         [Fact]
-        public void GivenTwoFilesThatExist_WhenArchive_ThenSavesArchiveFileWithContent()
+        public void GivenTwoFilesThatExist_WhenArchive_ThenCreatedArchiveWithContent()
         {
             var fileNames = new[] { "file1.bin", "file2.exe" };
             var archiveFileName = "archive";
@@ -30,12 +29,10 @@ namespace Marchive.Tests
             A.CallTo(() => _fileSystem.ReadAllBytes(A<string>.Ignored))
                 .Returns(fileContent);
 
-            _archiver.Archive(fileNames.ToList(), archiveFileName);
+            var archive = _archiver.Archive(fileNames.ToList(), archiveFileName);
 
-            A.CallTo(() =>
-                    _fileSystem.SaveFile(A<string>.Ignored,
-                        A<byte[]>.That.Matches(x => x.Length > fileContent.Length * 2)))
-                .MustHaveHappenedOnceExactly();
+            archive.Length.Should()
+                .Be(fileContent.Length * 2 + Constants.MetaBlockSizeBytes * 2 + Constants.HeaderSizeBytes);
         }
 
         [Fact]
