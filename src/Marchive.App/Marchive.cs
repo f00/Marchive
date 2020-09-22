@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Marchive.App.IO;
@@ -14,26 +15,34 @@ namespace Marchive.App
         private readonly UnArchiver _unArchiver;
         private readonly IFileSystem _fileSystem;
         private readonly ILogger<Marchive> _logger;
+        private readonly MArchiveSettings _settings;
 
-        public Marchive(Archiver archiver, UnArchiver unArchiver, IFileSystem fileSystem, ILogger<Marchive> logger)
+        public Marchive(
+            Archiver archiver,
+            UnArchiver unArchiver,
+            IFileSystem fileSystem,
+            ILogger<Marchive> logger,
+            MArchiveSettings settings)
         {
             _archiver = archiver;
             _unArchiver = unArchiver;
             _fileSystem = fileSystem;
             _logger = logger;
+            _settings = settings;
         }
 
-        /// <summary>
-        /// Archives one or many files into one single .mar archive file
-        /// </summary>
-        /// <param name="fileNames">The names (including path) of the files to archive</param>
-        /// <param name="archiveFileName">The desired name of the outputted archive file</param>
-        public void Archive(List<string> fileNames, string archiveFileName)
+        public void Archive(List<string> fileNames, string archiveFileName, string password = null)
         {
             var archive = _archiver.Archive(fileNames, archiveFileName);
             if (!archive.Any())
             {
                 return;
+            }
+
+            if (password != null)
+            {
+                archive = ResolveEncryptionAlgorithm(_settings.EncryptionAlgorithm)
+                    .Encrypt(archive, password);
             }
 
             var saveFileName = archiveFileName + Constants.FileExtensionName;
@@ -42,14 +51,17 @@ namespace Marchive.App
             _logger.LogInformation("Archive {filename} successfully created.", saveFileName);
         }
 
-        /// <summary>
-        /// Extracts an existing .mar archive into the desired output directory
-        /// </summary>
-        /// <param name="archiveFileName">Name of the archive file (without file extension)</param>
-        /// <param name="outputUnArchiveDirectory">(Optional) Name of the desired output directory in which the extracted filed will be placed</param>
-        public void UnArchive(string archiveFileName, string outputUnArchiveDirectory = null)
+        public void UnArchive(string archiveFileName, string outputUnArchiveDirectory = null, string password = null)
         {
-            var files = _unArchiver.UnArchive(archiveFileName);
+            archiveFileName = AppendFileExtensionIfNeeded(archiveFileName);
+
+            var archive = _fileSystem.ReadAllBytes(archiveFileName);
+            if (password != null)
+            {
+                archive = ResolveEncryptionAlgorithm(_settings.EncryptionAlgorithm).Decrypt(archive, password);
+            }
+
+            var files = _unArchiver.UnArchive(archive);
 
             outputUnArchiveDirectory ??= Directory.GetCurrentDirectory();
 
@@ -61,6 +73,23 @@ namespace Marchive.App
                 _logger.LogInformation("{filename} successfully extracted to {outputUnArchiveDirectory}.", filename,
                     outputUnArchiveDirectory);
             }
+        }
+
+        private static IEncryptionAlgorithm ResolveEncryptionAlgorithm(EncryptionAlgorithm algorithmName) =>
+            algorithmName switch
+            {
+                EncryptionAlgorithm.Aes => new AesEncryption(),
+                _ => throw new ArgumentException(message: "invalid enum value", paramName: nameof(algorithmName))
+            };
+
+        private static string AppendFileExtensionIfNeeded(string archiveFileName)
+        {
+            if (!archiveFileName.EndsWith(Constants.FileExtensionName))
+            {
+                archiveFileName += Constants.FileExtensionName;
+            }
+
+            return archiveFileName;
         }
     }
 }

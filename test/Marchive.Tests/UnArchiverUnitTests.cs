@@ -1,13 +1,10 @@
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text;
 using FakeItEasy;
 using FluentAssertions;
-using Marchive.App;
 using Marchive.App.IO;
 using Marchive.App.Services;
-using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Marchive.Tests
@@ -19,7 +16,7 @@ namespace Marchive.Tests
 
         public UnArchiverUnitTests()
         {
-            _unArchiver = new UnArchiver(_fileSystem);
+            _unArchiver = new UnArchiver();
         }
 
         [Fact]
@@ -29,10 +26,8 @@ namespace Marchive.Tests
             var filesInArchive = new List<(string name, string content)>()
                 {("file1.bin", "file 1 content and then some"), ("file2.bin", "file 2 content")};
             var archiveContent = GetArchive(archiveFileName, filesInArchive);
-            A.CallTo(() => _fileSystem.ReadAllBytes(A<string>.Ignored))
-                .Returns(archiveContent);
 
-            var files = _unArchiver.UnArchive(archiveFileName).ToList();
+            var files = _unArchiver.UnArchive(archiveContent).ToList();
 
             files.Select(f => f.filename).Should().BeEquivalentTo(filesInArchive.Select(f => f.name));
             files.Select(f => f.content).Should()

@@ -9,13 +9,15 @@ namespace Marchive.App
         /// </summary>
         /// <param name="fileNames">The names (including path) of the files to archive</param>
         /// <param name="archiveFileName">The desired name of the outputted archive file</param>
-        void Archive(List<string> fileNames, string archiveFileName);
+        /// <param name="password">The password to use if encryption is desired</param>
+        void Archive(List<string> fileNames, string archiveFileName, string password = null);
 
         /// <summary>
         /// Extracts an existing .mar archive into the desired output directory
         /// </summary>
         /// <param name="archiveFileName">Name of the archive file (without file extension)</param>
         /// <param name="outputUnArchiveDirectory">(Optional) Name of the desired output directory in which the extracted filed will be placed</param>
-        void UnArchive(string archiveFileName, string outputUnArchiveDirectory = null);
+        /// <param name="password">The password to use for decryption if archive is encrypted</param>
+        void UnArchive(string archiveFileName, string outputUnArchiveDirectory = null, string password = null);
     }
 }

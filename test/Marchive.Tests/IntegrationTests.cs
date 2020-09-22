@@ -3,6 +3,7 @@ using System.Linq;
 using FakeItEasy;
 using Marchive.App.IO;
 using Marchive.App.Services;
+using Marchive.App.Settings;
 using Microsoft.Extensions.Logging;
 using Xunit;
 
@@ -16,8 +17,8 @@ namespace Marchive.Tests
         public IntegrationTests()
         {
             var fileSystem = new FileSystemProxy();
-            _marchive = new App.Marchive(new Archiver(fileSystem), new UnArchiver(fileSystem), fileSystem,
-                A.Fake<ILogger<App.Marchive>>());
+            _marchive = new App.Marchive(new Archiver(fileSystem), new UnArchiver(), fileSystem,
+                A.Fake<ILogger<App.Marchive>>(), new MArchiveSettings());
         }
 
         [Fact]
