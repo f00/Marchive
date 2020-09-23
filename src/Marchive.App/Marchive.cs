@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Marchive.App.Exceptions;
 using Marchive.App.IO;
 using Marchive.App.Services;
 using Marchive.App.Settings;
@@ -11,6 +12,7 @@ namespace Marchive.App
 {
     internal class Marchive : IMarchive
     {
+        private const int Int32Bytes = 4;
         private readonly Archiver _archiver;
         private readonly UnArchiver _unArchiver;
         private readonly IFileSystem _fileSystem;
@@ -41,13 +43,16 @@ namespace Marchive.App
 
             if (password != null)
             {
-                archive = ResolveEncryptionAlgorithm(_settings.EncryptionAlgorithm)
-                    .Encrypt(archive, password);
-                archive = AddEncryptionFlagToArchive(archive, true);
+                if (_settings.EncryptionAlgorithmName == EncryptionAlgorithmName.None)
+                {
+                    throw new EncryptionException("Password was provided but encryption is not enabled.");
+                }
+                var encryption = ResolveEncryptionAlgorithm(_settings.EncryptionAlgorithmName);
+                archive = AddEncryptionInfoToArchive(encryption.Encrypt(archive, password), _settings.EncryptionAlgorithmName);
             }
             else
             {
-                archive = AddEncryptionFlagToArchive(archive, false);
+                archive = AddEncryptionInfoToArchive(archive, EncryptionAlgorithmName.None);
             }
 
             var saveFileName = archiveFileName + Constants.FileExtensionName;
@@ -56,31 +61,26 @@ namespace Marchive.App
             _logger.LogInformation("Archive {filename} successfully created.", saveFileName);
         }
 
-        private static byte[] AddEncryptionFlagToArchive(byte[] archive, bool encryptionEnabled)
+        private byte[] AddEncryptionInfoToArchive(byte[] archive, EncryptionAlgorithmName encryptionAlgorithmName)
         {
-            var newArchive = new byte[archive.Length + 1];
-            var bytes = BitConverter.GetBytes(encryptionEnabled);
+            var newArchive = new byte[archive.Length + Int32Bytes];
+            var bytes = BitConverter.GetBytes((int)encryptionAlgorithmName);
             archive.CopyTo(newArchive, 0);
             bytes.CopyTo(newArchive, archive.Length);
 
             return newArchive;
         }
 
-        private static bool IsArchiveEncrypted(byte[] archive, out byte[] archiveStripped)
-        {
-            archiveStripped = new byte[archive.Length - 1];
-            var encryptionEnabled = BitConverter.ToBoolean(archive, archive.Length - 1);
-            Array.Copy(archive, archiveStripped, archiveStripped.Length);
-
-            return encryptionEnabled;
-        }
-
         public void UnArchive(string archiveFileName, string outputUnArchiveDirectory = null, string password = null)
         {
             archiveFileName = AppendFileExtensionIfNeeded(archiveFileName);
 
-            var archive = IsArchiveEncrypted(_fileSystem.ReadAllBytes(archiveFileName), out var archiveStripped)
-                ? ResolveEncryptionAlgorithm(_settings.EncryptionAlgorithm).Decrypt(archiveStripped, password)
+            var encryptionAlgorithmName =
+                GetEncryptionAlgorithmNameFromArchive(_fileSystem.ReadAllBytes(archiveFileName),
+                    out var archiveStripped);
+
+            var archive = encryptionAlgorithmName != EncryptionAlgorithmName.None
+                ? ResolveEncryptionAlgorithm(encryptionAlgorithmName).Decrypt(archiveStripped, password)
                 : archiveStripped;
 
             var files = _unArchiver.UnArchive(archive);
@@ -97,13 +97,6 @@ namespace Marchive.App
             }
         }
 
-        private static IEncryptionAlgorithm ResolveEncryptionAlgorithm(EncryptionAlgorithm algorithmName) =>
-            algorithmName switch
-            {
-                EncryptionAlgorithm.Aes => new AesEncryption(),
-                _ => throw new ArgumentException(message: "invalid enum value", paramName: nameof(algorithmName))
-            };
-
         private static string AppendFileExtensionIfNeeded(string archiveFileName)
         {
             if (!archiveFileName.EndsWith(Constants.FileExtensionName))
@@ -113,5 +106,22 @@ namespace Marchive.App
 
             return archiveFileName;
         }
+
+        private static EncryptionAlgorithmName GetEncryptionAlgorithmNameFromArchive(byte[] archive, out byte[] archiveStrippedOfEncryptionInfo)
+        {
+            var encryptionAlgorithm = (EncryptionAlgorithmName)BitConverter.ToInt32(archive, archive.Length - Int32Bytes);
+            archiveStrippedOfEncryptionInfo = new byte[archive.Length - Int32Bytes];
+
+            Array.Copy(archive, archiveStrippedOfEncryptionInfo, archiveStrippedOfEncryptionInfo.Length);
+
+            return encryptionAlgorithm;
+        }
+
+        private static IEncryptionAlgorithm ResolveEncryptionAlgorithm(EncryptionAlgorithmName algorithmNameName) =>
+            algorithmNameName switch
+            {
+                EncryptionAlgorithmName.Aes => new AesEncryption(),
+                _ => throw new ArgumentException(message: "invalid enum value", paramName: nameof(algorithmNameName))
+            };
     }
 }

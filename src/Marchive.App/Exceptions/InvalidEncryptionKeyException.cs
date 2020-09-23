@@ -4,7 +4,7 @@ using System.Runtime.Serialization;
 namespace Marchive.App.Exceptions
 {
     [Serializable]
-    public class InvalidEncryptionKeyException : Exception
+    public class InvalidEncryptionKeyException : EncryptionException
     {
         public InvalidEncryptionKeyException()
         {

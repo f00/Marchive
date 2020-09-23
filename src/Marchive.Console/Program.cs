@@ -29,7 +29,7 @@ namespace Marchive.Console
                         });
                     services.AddMarchive(configure =>
                     {
-                        configure.EncryptionAlgorithm = EncryptionAlgorithm.Aes;
+                        configure.EncryptionAlgorithmName = EncryptionAlgorithmName.Aes;
                         configure.FileNameEncoding = System.Console.InputEncoding;
                     });
 

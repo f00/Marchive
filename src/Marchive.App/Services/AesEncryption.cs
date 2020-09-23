@@ -19,15 +19,15 @@ namespace Marchive.App.Services
         public byte[] Encrypt(byte[] data, string password)
         {
             if (data == null || data.Length <= 0)
-                throw new ArgumentNullException(nameof(data));
+                throw new EncryptionException("No data to encrypt.");
             if (string.IsNullOrWhiteSpace(password))
-                throw new ArgumentNullException(nameof(password));
+                throw new EncryptionException("Empty password provided for encryption.");
 
             var initializationVector = CreateInitializationVector();
             using var aes = Aes.Create();
             if (aes == null)
             {
-                throw new Exception("Could not create an AES crypto service provider");
+                throw new EncryptionException("Could not create an AES crypto service provider.");
             }
 
             var salt = CreateSalt();
@@ -77,7 +77,7 @@ namespace Marchive.App.Services
         public byte[] Decrypt(byte[] data, string password)
         {
             if (data == null || data.Length <= 0)
-                throw new ArgumentNullException(nameof(data));
+                throw new EncryptionException("No data to decrypt.");
             if (string.IsNullOrWhiteSpace(password))
                 throw new InvalidEncryptionKeyException();
 
@@ -90,7 +90,7 @@ namespace Marchive.App.Services
             using var aes = Aes.Create();
             if (aes == null)
             {
-                throw new Exception("Could not create an AES crypto service provider");
+                throw new EncryptionException("Could not create an AES crypto service provider.");
             }
             aes.Key = DeriveKey(password, salt);
             aes.IV = initializationVector;
