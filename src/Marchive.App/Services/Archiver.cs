@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using Marchive.App.IO;
 using Marchive.App.Settings;
+using Marchive.App.Utilities;
 
 namespace Marchive.App.Services
 {
@@ -12,8 +13,8 @@ namespace Marchive.App.Services
     /// +--------+--------------+-----------+
     /// | HEADER | FILE CONTENT | META DATA |
     /// +--------+--------------+-----------+
-    /// * Header contains starting position of meta data block
-    /// * Meta data block contains one sub blocks per file in archive
+    /// * HEADER contains starting position of meta data block
+    /// * META DATA contains one sub blocks per file in archive
     /// * Sub blocks contain start and end position of the file and the file name
     /// </summary>
     internal class Archiver : IDisposable
@@ -22,6 +23,13 @@ namespace Marchive.App.Services
         private readonly MemoryStream _archiveStream;
         private readonly MemoryStream _metaDataStream;
         private readonly MArchiveSettings _settings;
+
+        public const int HeaderSizeBytes = 8;
+        public const int MetaDataFileStartPosSizeBytes = 8;
+        public const int MetaDataFileEndPosSizeBytes = 8;
+        public const int MaxFileNameLengthBytes = 496;
+
+        public static int MetaBlockSizeBytes => MetaDataFileStartPosSizeBytes + MetaDataFileEndPosSizeBytes + MaxFileNameLengthBytes;
 
         public Archiver(IFileSystem fileSystem, MArchiveSettings settings = null)
         {
@@ -69,16 +77,16 @@ namespace Marchive.App.Services
 
         private void WriteEmptyHeaderToArchiveStream()
         {
-            var emptyHeaderBlock = new byte[Constants.HeaderSizeBytes];
+            var emptyHeaderBlock = new byte[HeaderSizeBytes];
             _archiveStream.Write(emptyHeaderBlock);
         }
 
         private void ValidateFileNameLength(string filename)
         {
-            if (_settings.FileNameEncoding.GetBytes(filename).Length > Constants.MaxFileNameLengthBytes)
+            if (_settings.FileNameEncoding.GetBytes(filename).Length > MaxFileNameLengthBytes)
             {
                 throw new ArgumentOutOfRangeException(nameof(filename),
-                    $"Filename {filename} is too long. Maximum {Constants.MaxFileNameLengthBytes} bytes allowed.");
+                    $"Filename {filename} is too long. Maximum {MaxFileNameLengthBytes} bytes allowed.");
             }
         }
 
@@ -94,9 +102,9 @@ namespace Marchive.App.Services
         private void WriteFileMetaDataToMetaStream(string fileName, long fileStartingIndex, long fileEndingIndex)
         {
             var metaFileInfoBlock = new MemoryStream();
-            var fileNameBlock = new byte[Constants.MaxFileNameLengthBytes];
-            var fileStartingIndexBlock = new byte[Constants.MetaDataFileStartPosSizeBytes];
-            var fileEndingIndexBlock = new byte[Constants.MetaDataFileEndPosSizeBytes];
+            var fileNameBlock = new byte[MaxFileNameLengthBytes];
+            var fileStartingIndexBlock = new byte[MetaDataFileStartPosSizeBytes];
+            var fileEndingIndexBlock = new byte[MetaDataFileEndPosSizeBytes];
             BitConverter.GetBytes(fileStartingIndex).CopyTo(fileStartingIndexBlock, 0);
             BitConverter.GetBytes(fileEndingIndex).CopyTo(fileEndingIndexBlock, 0);
             _settings.FileNameEncoding.GetBytes(fileName).CopyTo(fileNameBlock, 0);
@@ -107,11 +115,42 @@ namespace Marchive.App.Services
             _metaDataStream.Write(metaFileInfoBlock.ToArray());
         }
 
-        private byte[] UpdateArchiveHeaderWithMetaBlockStartingPosition(long metaBlockStartingPosition, byte[] archive)
+        private static byte[] UpdateArchiveHeaderWithMetaBlockStartingPosition(long metaBlockStartingPosition, byte[] archive)
         {
             BitConverter.GetBytes(metaBlockStartingPosition).CopyTo(archive, 0);
 
             return archive;
+        }
+
+        public IEnumerable<(string filename, byte[] content)> UnArchive(byte[] archive)
+        {
+            var metaDataPosition =
+                BitConverter.ToInt64(archive.Take(HeaderSizeBytes).ToArray(), 0);
+            var metaData = archive
+                .Skip((int)metaDataPosition)
+                .ChunkBy(MetaBlockSizeBytes);
+
+            foreach (var fileInfoMeta in metaData)
+            {
+                yield return ExtractFile(fileInfoMeta, archive);
+            }
+        }
+
+        private (string filename, byte[] content) ExtractFile(IReadOnlyCollection<byte> fileInfoMeta, IEnumerable<byte> archive)
+        {
+            var filename = _settings.FileNameEncoding.GetString(fileInfoMeta
+                .Skip(MetaDataFileStartPosSizeBytes + MetaDataFileEndPosSizeBytes)
+                .TakeWhile(x => x != 0).ToArray());
+
+            var dataStartingPos =
+                BitConverter.ToInt64(fileInfoMeta.Take(MetaDataFileStartPosSizeBytes).ToArray());
+
+            var dataEndingPos = BitConverter.ToInt64(fileInfoMeta.Skip(MetaDataFileStartPosSizeBytes)
+                .Take(MetaDataFileStartPosSizeBytes).ToArray());
+
+            var content = archive.Skip((int)dataStartingPos).Take((int)(dataEndingPos - dataStartingPos));
+
+            return (filename, content.ToArray());
         }
 
         public void Dispose()

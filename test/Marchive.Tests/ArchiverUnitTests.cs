@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using FakeItEasy;
@@ -32,7 +33,7 @@ namespace Marchive.Tests
             var archive = _archiver.Archive(fileNames.ToList(), archiveFileName);
 
             archive.Length.Should()
-                .Be(fileContent.Length * 2 + Constants.MetaBlockSizeBytes * 2 + Constants.HeaderSizeBytes);
+                .Be(fileContent.Length * 2 + Archiver.MetaBlockSizeBytes * 2 + Archiver.HeaderSizeBytes);
         }
 
         [Fact]
@@ -49,6 +50,26 @@ namespace Marchive.Tests
             var archiveFileName = "archive";
 
             Assert.Throws<ArgumentOutOfRangeException>(() => _archiver.Archive(new[] { fileName }.ToList(), archiveFileName));
+        }
+
+        [Fact]
+        public void GivenExistingArchive_WhenUnArchive_ThenReturnsExtractedFiles()
+        {
+            var archiveFileName = "archive";
+            var filesInArchive = new List<(string name, string content)>()
+                {("file1.bin", "file 1 content and then some"), ("file2.bin", "file 2 content")};
+            foreach (var file in filesInArchive)
+            {
+                A.CallTo(() => _fileSystem.ReadAllBytes(file.name))
+                    .Returns(Encoding.UTF8.GetBytes(file.content));
+            }
+            var archiveContent = _archiver.Archive(filesInArchive.Select(x => x.name).ToList(), archiveFileName);
+
+            var files = _archiver.UnArchive(archiveContent).ToList();
+
+            files.Select(f => f.filename).Should().BeEquivalentTo(filesInArchive.Select(f => f.name));
+            files.Select(f => f.content).Should()
+                .BeEquivalentTo(filesInArchive.Select(f => Encoding.UTF8.GetBytes(f.content)));
         }
     }
 }

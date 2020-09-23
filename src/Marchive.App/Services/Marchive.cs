@@ -4,30 +4,34 @@ using System.IO;
 using System.Linq;
 using Marchive.App.Exceptions;
 using Marchive.App.IO;
-using Marchive.App.Services;
 using Marchive.App.Settings;
 using Microsoft.Extensions.Logging;
 
-namespace Marchive.App
+namespace Marchive.App.Services
 {
+    /// <summary>
+    /// Data format
+    /// +---------------------------------------+
+    /// | ARCHIVE DATA | ENCRYPTION INFORMATION |
+    /// +---------------------------------------+
+    /// </summary>
     internal class Marchive : IMarchive
     {
-        private const int Int32Bytes = 4;
         private readonly Archiver _archiver;
-        private readonly UnArchiver _unArchiver;
         private readonly IFileSystem _fileSystem;
         private readonly ILogger<Marchive> _logger;
         private readonly MArchiveSettings _settings;
 
+        public const string FileExtensionName = ".mar";
+        private const int EncryptionInformationHeaderSizeBytes = 4;
+
         public Marchive(
             Archiver archiver,
-            UnArchiver unArchiver,
             IFileSystem fileSystem,
             ILogger<Marchive> logger,
             MArchiveSettings settings)
         {
             _archiver = archiver;
-            _unArchiver = unArchiver;
             _fileSystem = fileSystem;
             _logger = logger;
             _settings = settings;
@@ -41,29 +45,39 @@ namespace Marchive.App
                 return;
             }
 
+            var encryptedArchive = EncryptArchive(archive, password);
+
+            var saveFileName = archiveFileName + FileExtensionName;
+            _fileSystem.SaveFile(saveFileName, encryptedArchive);
+
+            _logger.LogInformation("Archive {filename} successfully created.", saveFileName);
+        }
+
+        private byte[] EncryptArchive(byte[] archive, string password)
+        {
+            byte[] encryptedArchive;
             if (password != null)
             {
                 if (_settings.EncryptionAlgorithmName == EncryptionAlgorithmName.None)
                 {
                     throw new EncryptionException("Password was provided but encryption is not enabled.");
                 }
-                var encryption = ResolveEncryptionAlgorithm(_settings.EncryptionAlgorithmName);
-                archive = AddEncryptionInfoToArchive(encryption.Encrypt(archive, password), _settings.EncryptionAlgorithmName);
+
+                var encryptionAlgorithm = ResolveEncryptionAlgorithm(_settings.EncryptionAlgorithmName);
+                encryptedArchive = AddEncryptionInfoToArchive(encryptionAlgorithm.Encrypt(archive, password),
+                    _settings.EncryptionAlgorithmName);
             }
             else
             {
-                archive = AddEncryptionInfoToArchive(archive, EncryptionAlgorithmName.None);
+                encryptedArchive = AddEncryptionInfoToArchive(archive, EncryptionAlgorithmName.None);
             }
 
-            var saveFileName = archiveFileName + Constants.FileExtensionName;
-            _fileSystem.SaveFile(saveFileName, archive);
-
-            _logger.LogInformation("Archive {filename} successfully created.", saveFileName);
+            return encryptedArchive;
         }
 
-        private byte[] AddEncryptionInfoToArchive(byte[] archive, EncryptionAlgorithmName encryptionAlgorithmName)
+        private static byte[] AddEncryptionInfoToArchive(byte[] archive, EncryptionAlgorithmName encryptionAlgorithmName)
         {
-            var newArchive = new byte[archive.Length + Int32Bytes];
+            var newArchive = new byte[archive.Length + EncryptionInformationHeaderSizeBytes];
             var bytes = BitConverter.GetBytes((int)encryptionAlgorithmName);
             archive.CopyTo(newArchive, 0);
             bytes.CopyTo(newArchive, archive.Length);
@@ -75,15 +89,9 @@ namespace Marchive.App
         {
             archiveFileName = AppendFileExtensionIfNeeded(archiveFileName);
 
-            var encryptionAlgorithmName =
-                GetEncryptionAlgorithmNameFromArchive(_fileSystem.ReadAllBytes(archiveFileName),
-                    out var archiveStripped);
+            var archive = DecryptArchive(archiveFileName, password);
 
-            var archive = encryptionAlgorithmName != EncryptionAlgorithmName.None
-                ? ResolveEncryptionAlgorithm(encryptionAlgorithmName).Decrypt(archiveStripped, password)
-                : archiveStripped;
-
-            var files = _unArchiver.UnArchive(archive);
+            var files = _archiver.UnArchive(archive);
 
             outputUnArchiveDirectory ??= Directory.GetCurrentDirectory();
 
@@ -99,18 +107,31 @@ namespace Marchive.App
 
         private static string AppendFileExtensionIfNeeded(string archiveFileName)
         {
-            if (!archiveFileName.EndsWith(Constants.FileExtensionName))
+            if (!archiveFileName.EndsWith(FileExtensionName))
             {
-                archiveFileName += Constants.FileExtensionName;
+                archiveFileName += FileExtensionName;
             }
 
             return archiveFileName;
         }
 
+        private byte[] DecryptArchive(string archiveFileName, string password)
+        {
+            var archive = _fileSystem.ReadAllBytes(archiveFileName);
+            var encryptionAlgorithmName =
+                GetEncryptionAlgorithmNameFromArchive(archive, out var archiveStripped);
+
+            var decryptedArchive = encryptionAlgorithmName != EncryptionAlgorithmName.None
+                ? ResolveEncryptionAlgorithm(encryptionAlgorithmName).Decrypt(archiveStripped, password)
+                : archiveStripped;
+
+            return decryptedArchive;
+        }
+
         private static EncryptionAlgorithmName GetEncryptionAlgorithmNameFromArchive(byte[] archive, out byte[] archiveStrippedOfEncryptionInfo)
         {
-            var encryptionAlgorithm = (EncryptionAlgorithmName)BitConverter.ToInt32(archive, archive.Length - Int32Bytes);
-            archiveStrippedOfEncryptionInfo = new byte[archive.Length - Int32Bytes];
+            var encryptionAlgorithm = (EncryptionAlgorithmName)BitConverter.ToInt32(archive, archive.Length - EncryptionInformationHeaderSizeBytes);
+            archiveStrippedOfEncryptionInfo = new byte[archive.Length - EncryptionInformationHeaderSizeBytes];
 
             Array.Copy(archive, archiveStrippedOfEncryptionInfo, archiveStrippedOfEncryptionInfo.Length);
 

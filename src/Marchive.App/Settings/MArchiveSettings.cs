@@ -1,24 +1,20 @@
 ﻿using System.Text;
+using Marchive.App.Exceptions;
 
 namespace Marchive.App.Settings
 {
     public class MArchiveSettings
     {
         /// <summary>
-        /// Configure behavior of archiver
+        /// What encoding that should be used for processing file names.
         /// </summary>
-        /// <param name="fileNameEncoding">Encoding of the given file names</param>
-        /// <param name="encryptionAlgorithmName">The encryption algorithm to use if file encryption is enabled</param>
-        public MArchiveSettings(Encoding fileNameEncoding, EncryptionAlgorithmName encryptionAlgorithmName)
-        {
-            FileNameEncoding = fileNameEncoding;
-            EncryptionAlgorithmName = encryptionAlgorithmName;
-        }
-
-        public MArchiveSettings()
-        {
-        }
         public Encoding FileNameEncoding { get; set; } = Encoding.UTF8;
+
+        /// <summary>
+        /// Which encryption algorithm to use, if any.<para />
+        /// Note that if <see cref="T:EncryptionAlgorithmName.None"/> is selected then an <see cref="EncryptionException"/>
+        /// will have to be handled if a password is provided anyway.
+        /// </summary>
         public EncryptionAlgorithmName EncryptionAlgorithmName { get; set; } = EncryptionAlgorithmName.Aes;
     }
 }

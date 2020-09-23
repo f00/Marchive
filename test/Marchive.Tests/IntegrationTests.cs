@@ -15,7 +15,7 @@ namespace Marchive.Tests
 {
     public class IntegrationTests : IDisposable
     {
-        private readonly App.Marchive _sut;
+        private readonly App.Services.Marchive _sut;
         private const string FixturePath = "Fixtures";
         private const string FileName1 = "input1.txt";
         private const string FileName2 = "input2.txt";
@@ -26,8 +26,8 @@ namespace Marchive.Tests
         public IntegrationTests()
         {
             var fileSystem = new FileSystemProxy();
-            _sut = new App.Marchive(new Archiver(fileSystem), new UnArchiver(), fileSystem,
-                A.Fake<ILogger<App.Marchive>>(), new MArchiveSettings());
+            _sut = new App.Services.Marchive(new Archiver(fileSystem), fileSystem,
+                A.Fake<ILogger<App.Services.Marchive>>(), new MArchiveSettings());
         }
 
         [Fact]

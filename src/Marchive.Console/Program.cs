@@ -11,9 +11,9 @@ namespace Marchive.Console
 {
     public class Program
     {
-        private const string AppName = "Marchive archiver";
-        private const string AppDescription =
-            "Marchive is a command line utility that lets you easily archive multiple files into a single one, in a jiffy.";
+        private const string Name = "Marchive archiver";
+        private const string Description =
+            "Marchive is a command line utility that lets you easily archive and encrypt multiple files into a single one, in a jiffy.";
         private const string DefaultArchiveFileName = "archive";
         private static IMarchive _marchive;
 
@@ -39,9 +39,9 @@ namespace Marchive.Console
 
             var app = new CommandLineApplication(false)
             {
-                FullName = AppName,
-                Name = "Marchive.Console",
-                Description = AppDescription
+                Name = AppDomain.CurrentDomain.FriendlyName,
+                FullName = Name,
+                Description = Description
             };
             app.HelpOption("-? | -h | --help");
 
@@ -56,7 +56,7 @@ namespace Marchive.Console
             catch (InvalidEncryptionKeyException)
             {
                 System.Console.ForegroundColor = ConsoleColor.Yellow;
-                System.Console.WriteLine("Invalid password provided (or archive is not password protected).");
+                System.Console.WriteLine("Invalid password provided (or archive is corrupt).");
                 System.Console.ResetColor();
             }
             catch (Exception e)
@@ -72,10 +72,10 @@ namespace Marchive.Console
             app.Command("archive",
                 archive =>
                 {
-                    archive.Description = "Archive one or more files into one single file";
+                    archive.Description = "Archive one or more files into a single file.";
                     var filesToArchive = archive.Argument(
                         "files",
-                        "The names of the files to be archived",
+                        "The names of the files to be archived.",
                         multipleValues: true);
                     var archiveFileName = archive.Option(
                         "-n | --name",
@@ -102,14 +102,14 @@ namespace Marchive.Console
             app.Command("un-archive",
                 unArchive =>
                 {
-                    unArchive.Description = "Un archive / extract a previously created archive file";
+                    unArchive.Description = "Un archive / extract a previously created archive file.";
                     var archiveFileName = unArchive.Argument(
                         "archive",
-                        "The name of the archived file",
+                        "The name of the archive file.",
                         multipleValues: false);
                     var archiveDirectory = unArchive.Option(
                         "-d | --directory",
-                        "The directory in which the extracted files will be placed (defaults to current).",
+                        "The directory in which the extracted files will be placed (defaults to current directory).",
                         CommandOptionType.SingleValue);
                     var decryptionKey = unArchive.Option(
                         "-p | --password",

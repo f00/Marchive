@@ -9,7 +9,7 @@ namespace Marchive.App
         /// </summary>
         /// <param name="fileNames">The names (including path) of the files to archive</param>
         /// <param name="archiveFileName">The desired name of the outputted archive file</param>
-        /// <param name="password">The password to use if encryption is desired</param>
+        /// <param name="password">The password to use if encryption is desired. Encryption must be enabled in settings if a password is provided.</param>
         void Archive(List<string> fileNames, string archiveFileName, string password = null);
 
         /// <summary>

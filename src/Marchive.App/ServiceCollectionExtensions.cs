@@ -17,8 +17,7 @@ namespace Marchive.App
             services.AddSingleton<IFileSystem, FileSystemProxy>();
 
             services.AddScoped<Archiver>();
-            services.AddScoped<UnArchiver>();
-            services.AddScoped<IMarchive, Marchive>();
+            services.AddScoped<IMarchive, Services.Marchive>();
         }
     }
 }

@@ -1,8 +1,7 @@
 {
   "profiles": {
     "Marchive.Console": {
-      "commandName": "Project",
-      "commandLineArgs": "archive --name archive input1.txt -p password"
+      "commandName": "Project"
     }
   }
 }

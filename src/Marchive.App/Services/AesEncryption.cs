@@ -8,12 +8,24 @@ namespace Marchive.App.Services
 {
     // https://docs.microsoft.com/en-us/dotnet/api/system.security.cryptography.aes?view=netcore-3.1
     // https://docs.microsoft.com/en-us/dotnet/api/system.security.cryptography.rfc2898derivebytes?view=netcore-3.1
+
+    /// <summary>
+    /// Provides data confidentiality and integrity using AES cryptography and HMAC message authentication
+    /// 
+    /// Encryption data format
+    /// +------------------------------------------------------+
+    /// | SALT | INITIALIZATION VECTOR | ENCRYPTED DATA | HMAC |
+    /// +------------------------------------------------------+
+    /// The data is encrypted using AES with a 128 bit key derived from the provided password
+    /// The salt and initialization vectors are created in a transient manner and stored in the output data
+    /// A HMAC (SHA256) is computed from the above data using the same key and appended to the final output data
+    /// </summary>
     internal class AesEncryption : IEncryptionAlgorithm
     {
-        private const int KeyDerivationIterations = 5000;
-        private const int KeySizeBytes = 16;
-        private const int SaltSizeBytes = 8;
-        private const int InitializationVectorSizeBytes = 16;
+        private const int KeyDerivationIterations = 50000;
+        private const int KeySizeBytes = 16; // (128 bits)
+        private const int SaltSizeBytes = 8;  // (64 bits)
+        private const int InitializationVectorSizeBytes = 16; // (128 bits)
         private const int HMacSizeBytes = 32; // (256 bits)
 
         public byte[] Encrypt(byte[] data, string password)
@@ -38,20 +50,22 @@ namespace Marchive.App.Services
 
             using var encryptionStream = new MemoryStream();
 
-            // Store salt and IV in data
+            // Write salt and IV to encryptionStream
             encryptionStream.Write(salt, 0, salt.Length);
             encryptionStream.Write(initializationVector, 0, initializationVector.Length);
 
+            // Encrypt data and write it to encryptionStream
             using var cryptoStream = new CryptoStream(encryptionStream, encryptor, CryptoStreamMode.Write);
-
             cryptoStream.Write(data, 0, data.Length);
 
             cryptoStream.FlushFinalBlock();
             cryptoStream.Close();
 
+            // Compute HMAC
             var encryptedData = encryptionStream.ToArray();
             var hMac = ComputeHmac256(aes.Key, encryptedData);
 
+            // Merge encrypted data and HMAC into final payload
             var finalData = new byte[encryptedData.Length + hMac.Length];
             encryptedData.CopyTo(finalData, 0);
             hMac.CopyTo(finalData, encryptedData.Length);
