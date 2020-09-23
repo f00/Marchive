@@ -1,84 +1,148 @@
+using System;
 using System.IO;
 using System.Linq;
 using FakeItEasy;
+using FluentAssertions;
+using Marchive.App.Exceptions;
 using Marchive.App.IO;
 using Marchive.App.Services;
 using Marchive.App.Settings;
+using Marchive.Tests.Utilities;
 using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Marchive.Tests
 {
-    public class IntegrationTests
+    public class IntegrationTests : IDisposable
     {
-        private readonly App.Marchive _marchive;
+        private readonly App.Marchive _sut;
         private const string FixturePath = "Fixtures";
+        private const string FileName1 = "input1.txt";
+        private const string FileName2 = "input2.txt";
+        private const string FileName3 = "IMG_3555.jpg";
+        private const string ArchiveFileName = "archive";
+        private const string OutputUnArchiveDirectory = "UnArchive";
 
         public IntegrationTests()
         {
             var fileSystem = new FileSystemProxy();
-            _marchive = new App.Marchive(new Archiver(fileSystem), new UnArchiver(), fileSystem,
+            _sut = new App.Marchive(new Archiver(fileSystem), new UnArchiver(), fileSystem,
                 A.Fake<ILogger<App.Marchive>>(), new MArchiveSettings());
         }
 
         [Fact]
         public void GivenTwoTextFiles_WhenArchiveAndUnArchive_ThenUnArchivedFilesAreIdenticalToOriginal()
         {
-            // Arrange
-            var fileName1 = "input1.txt";
-            var fileName2 = "input2.txt";
-            var file1Path = Path.Combine(FixturePath, fileName1);
-            var file2Path = Path.Combine(FixturePath, fileName2);
-            const string archiveFileName = "archive";
-            const string unArchiveDirectory = "UnArchive";
-
             // Act
-            _marchive.Archive(new[] { file1Path, file2Path }.ToList(), archiveFileName);
-            _marchive.UnArchive(archiveFileName, unArchiveDirectory);
+            _sut.Archive(new[] { FileName1.WithPath(FixturePath), FileName2.WithPath(FixturePath) }.ToList(),
+                ArchiveFileName);
+            _sut.UnArchive(ArchiveFileName, OutputUnArchiveDirectory);
 
             // Assert
-            // ** Produces archive file **
-            Assert.True(File.Exists(archiveFileName + ".mar"));
-
-            // ** Extracts archived files **
-            Assert.True(File.Exists(Path.Combine(unArchiveDirectory, fileName1)));
-            Assert.True(File.Exists(Path.Combine(unArchiveDirectory, fileName2)));
-
-            // ** Extracted files are identical to original **
-            Assert.Equal(File.ReadAllBytes(file1Path), File.ReadAllBytes(Path.Combine(unArchiveDirectory, fileName1)));
-            Assert.Equal(File.ReadAllBytes(file2Path), File.ReadAllBytes(Path.Combine(unArchiveDirectory, fileName2)));
-
-            // Cleanup
-            File.Delete(archiveFileName + ".mar");
-            Directory.Delete(unArchiveDirectory, true);
+            AssertUnArchivedFilesAreIdenticalToOriginal(FileName1, FileName2);
         }
 
         [Fact]
         public void GivenOneImageFile_WhenArchiveAndUnArchive_ThenUnArchivedFileIsIdenticalToOriginal()
         {
-            // Arrange
-            var fileName = "IMG_3555.jpg";
-            var filePath = Path.Combine(FixturePath, fileName);
-            const string archiveFileName = "archive";
-            const string unArchiveDirectory = "UnArchive";
-
             // Act
-            _marchive.Archive(new[] { filePath }.ToList(), archiveFileName);
-            _marchive.UnArchive(archiveFileName, unArchiveDirectory);
+            _sut.Archive(new[] { FileName3.WithPath(FixturePath) }.ToList(), ArchiveFileName);
+            _sut.UnArchive(ArchiveFileName, OutputUnArchiveDirectory);
 
             // Assert
+            AssertUnArchivedFilesAreIdenticalToOriginal(FileName3);
+        }
+
+        [Fact]
+        public void GivenOneImageFile_WhenArchiveAndUnArchive_AndEncrypted_AndPasswordIsCorrect_ThenUnArchivedFileIsIdenticalToOriginal()
+        {
+            // Arrange
+            const string password = "password";
+
+            // Act
+            _sut.Archive(new[] { FileName3.WithPath(FixturePath) }.ToList(), ArchiveFileName, password);
+            _sut.UnArchive(ArchiveFileName, OutputUnArchiveDirectory, password);
+
+            // Assert
+            AssertUnArchivedFilesAreIdenticalToOriginal(FileName3);
+        }
+
+        [Fact]
+        public void GivenOneImageFile_WhenArchiveAndUnArchive_AndNotEncrypted_AndPasswordIsPassed_ThenUnArchivedFileIsIdenticalToOriginal()
+        {
+            // Arrange
+            const string password = "password";
+
+            // Act
+            _sut.Archive(new[] { FileName3.WithPath(FixturePath) }.ToList(), ArchiveFileName);
+            _sut.UnArchive(ArchiveFileName, OutputUnArchiveDirectory, password);
+
+            // Assert
+            AssertUnArchivedFilesAreIdenticalToOriginal(FileName3);
+        }
+
+        [Fact]
+        public void GivenOneImageFile_WhenArchiveAndUnArchive_AndEncrypted_AndPasswordIsIncorrect_ThenThrowsException()
+        {
+            // Arrange
+            const string password = "password";
+
+            // Act
+            _sut.Archive(new[] { FileName3.WithPath(FixturePath) }.ToList(), ArchiveFileName, password);
+            Action unArchive = () => _sut.UnArchive(ArchiveFileName, OutputUnArchiveDirectory, "anotherPass");
+
+            // Assert
+            unArchive.Should().Throw<InvalidEncryptionKeyException>();
+        }
+
+        [Fact]
+        public void GivenOneImageFile_WhenArchiveAndUnArchive_AndEncrypted_AndPasswordIsNull_ThenThrowsException()
+        {
+            // Arrange
+            const string password = "password";
+
+            // Act
+            _sut.Archive(new[] { FileName3.WithPath(FixturePath) }.ToList(), ArchiveFileName, password);
+            Action unArchive = () => _sut.UnArchive(ArchiveFileName, OutputUnArchiveDirectory, null);
+
+            // Assert
+            unArchive.Should().Throw<InvalidEncryptionKeyException>();
+        }
+
+        private static void AssertUnArchivedFilesAreIdenticalToOriginal(params string[] fileNames)
+        {
             // ** Produces archive file **
-            Assert.True(File.Exists(archiveFileName + ".mar"));
+            Assert.True(File.Exists(ArchiveFileName + ".mar"));
 
             // ** Extracts archived files **
-            Assert.True(File.Exists(Path.Combine(unArchiveDirectory, fileName)));
+            foreach (var fileName in fileNames)
+            {
+                Assert.True(File.Exists(fileName.WithPath(OutputUnArchiveDirectory)));
+            }
 
             // ** Extracted files are identical to original **
-            Assert.Equal(File.ReadAllBytes(filePath), File.ReadAllBytes(Path.Combine(unArchiveDirectory, fileName)));
+            foreach (var fileName in fileNames)
+            {
+                Assert.Equal(File.ReadAllBytes(fileName.WithPath(FixturePath)),
+                    File.ReadAllBytes(fileName.WithPath(OutputUnArchiveDirectory)));
+            }
+        }
 
-            // Cleanup
-            File.Delete(archiveFileName + ".mar");
-            Directory.Delete(unArchiveDirectory, true);
+        private static void CleanUpArchiveAndUnArchivedFiles()
+        {
+            if (File.Exists(ArchiveFileName + ".mar"))
+            {
+                File.Delete(ArchiveFileName + ".mar");
+            }
+            if (Directory.Exists(OutputUnArchiveDirectory))
+            {
+                Directory.Delete(OutputUnArchiveDirectory, true);
+            }
+        }
+
+        public void Dispose()
+        {
+            CleanUpArchiveAndUnArchivedFiles();
         }
     }
 }

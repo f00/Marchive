@@ -43,6 +43,11 @@ namespace Marchive.App
             {
                 archive = ResolveEncryptionAlgorithm(_settings.EncryptionAlgorithm)
                     .Encrypt(archive, password);
+                archive = AddEncryptionFlagToArchive(archive, true);
+            }
+            else
+            {
+                archive = AddEncryptionFlagToArchive(archive, false);
             }
 
             var saveFileName = archiveFileName + Constants.FileExtensionName;
@@ -51,15 +56,32 @@ namespace Marchive.App
             _logger.LogInformation("Archive {filename} successfully created.", saveFileName);
         }
 
+        private static byte[] AddEncryptionFlagToArchive(byte[] archive, bool encryptionEnabled)
+        {
+            var newArchive = new byte[archive.Length + 1];
+            var bytes = BitConverter.GetBytes(encryptionEnabled);
+            archive.CopyTo(newArchive, 0);
+            bytes.CopyTo(newArchive, archive.Length);
+
+            return newArchive;
+        }
+
+        private static bool IsArchiveEncrypted(byte[] archive, out byte[] archiveStripped)
+        {
+            archiveStripped = new byte[archive.Length - 1];
+            var encryptionEnabled = BitConverter.ToBoolean(archive, archive.Length - 1);
+            Array.Copy(archive, archiveStripped, archiveStripped.Length);
+
+            return encryptionEnabled;
+        }
+
         public void UnArchive(string archiveFileName, string outputUnArchiveDirectory = null, string password = null)
         {
             archiveFileName = AppendFileExtensionIfNeeded(archiveFileName);
 
-            var archive = _fileSystem.ReadAllBytes(archiveFileName);
-            if (password != null)
-            {
-                archive = ResolveEncryptionAlgorithm(_settings.EncryptionAlgorithm).Decrypt(archive, password);
-            }
+            var archive = IsArchiveEncrypted(_fileSystem.ReadAllBytes(archiveFileName), out var archiveStripped)
+                ? ResolveEncryptionAlgorithm(_settings.EncryptionAlgorithm).Decrypt(archiveStripped, password)
+                : archiveStripped;
 
             var files = _unArchiver.UnArchive(archive);
 

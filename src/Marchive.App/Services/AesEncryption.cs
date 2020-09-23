@@ -79,7 +79,7 @@ namespace Marchive.App.Services
             if (data == null || data.Length <= 0)
                 throw new ArgumentNullException(nameof(data));
             if (string.IsNullOrWhiteSpace(password))
-                throw new ArgumentNullException(nameof(password));
+                throw new InvalidEncryptionKeyException();
 
             // Get salt and IV from data
             var salt = new byte[SaltSizeBytes];
